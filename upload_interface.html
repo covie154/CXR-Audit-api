@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CXR Analysis - File Upload</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .form-container {
+            padding: 40px;
+        }
+        
+        .form-group {
+            margin-bottom: 25px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #333;
+            font-size: 1.1em;
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+        
+        .file-input {
+            width: 100%;
+            padding: 15px;
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            background: #f9f9f9;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+            font-size: 1em;
+        }
+        
+        .file-input:hover {
+            border-color: #4facfe;
+            background: #f0f8ff;
+        }
+        
+        .file-input.dragover {
+            border-color: #00f2fe;
+            background: #e6f7ff;
+            transform: scale(1.02);
+        }
+        
+        .file-selected {
+            margin-top: 10px;
+            padding: 10px;
+            background: #e8f5e8;
+            border-radius: 5px;
+            color: #2d5a27;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .remove-file-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            padding: 4px 8px;
+            font-size: 0.8em;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        
+        .remove-file-btn:hover {
+            background: #c82333;
+        }
+        
+        .file-info {
+            flex: 1;
+        }
+        
+        .threshold-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s ease;
+        }
+        
+        .threshold-input:focus {
+            outline: none;
+            border-color: #4facfe;
+            box-shadow: 0 0 10px rgba(79, 172, 254, 0.3);
+        }
+        
+        .submit-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(79, 172, 254, 0.4);
+        }
+        
+        .submit-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .status-container {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 8px;
+            display: none;
+        }
+        
+        .status-uploading {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        
+        .status-processing {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        
+        .status-completed {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        
+        .status-error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4facfe, #00f2fe);
+            width: 0%;
+            transition: width 0.3s ease;
+            border-radius: 10px;
+        }
+        
+        .results-container {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            display: none;
+        }
+        
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            padding: 8px 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .metric:last-child {
+            border-bottom: none;
+        }
+        
+        .metric-label {
+            font-weight: bold;
+            color: #495057;
+        }
+        
+        .metric-value {
+            color: #007bff;
+            font-weight: bold;
+        }
+        
+        .error-message {
+            color: #dc3545;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        
+        .help-text {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+            font-style: italic;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .loading {
+            animation: pulse 2s infinite;
+        }
+        
+        /* Mode toggle styling */
+        .mode-toggle {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            border: 2px solid #e9ecef;
+            margin-bottom: 25px;
+        }
+        
+        .mode-toggle label {
+            font-weight: normal !important;
+            font-size: 1em !important;
+            margin-bottom: 0 !important;
+            padding: 8px 15px;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+        }
+        
+        .mode-toggle label:hover {
+            background-color: #e9ecef;
+        }
+        
+        .mode-toggle input[type="radio"]:checked + span {
+            background-color: #4facfe;
+            color: white;
+            border-radius: 5px;
+            padding: 5px 10px;
+        }
+        
+        /* Multiple files specific styling */
+        .file-count {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .file-list {
+            max-height: 100px;
+            overflow-y: auto;
+            margin-top: 8px;
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+        }
+        
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 2px 0;
+            font-size: 0.85em;
+        }
+        
+        /* False negatives specific styling */
+        .metric-summary {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 15px;
+            color: #856404;
+        }
+        
+        .false-negative-table {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+        }
+        
+        .false-negative-table table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9em;
+        }
+        
+        .false-negative-table th,
+        .false-negative-table td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .false-negative-table th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+        }
+        
+        .false-negative-table tr:hover {
+            background-color: #f5f5f5;
+        }
+        
+        .download-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>CXR Analysis Tool</h1>
+            <p>Upload Lunit and Ground Truth files for statistical analysis</p>
+        </div>
+        
+        <div class="form-container">
+            <!-- Mode Toggle -->
+            <div class="form-group">
+                <label style="margin-bottom: 10px;">📁 Upload Mode</label>
+                <div class="mode-toggle">
+                    <div style="display: flex; gap: 15px; align-items: center;">
+                        <label style="display: flex; align-items: center; cursor: pointer;">
+                            <input type="radio" name="uploadMode" value="single" checked onchange="toggleUploadMode()" style="margin-right: 8px;">
+                            <span>🗂️ Single Files</span>
+                        </label>
+                        <label style="display: flex; align-items: center; cursor: pointer;">
+                            <input type="radio" name="uploadMode" value="multiple" onchange="toggleUploadMode()" style="margin-right: 8px;">
+                            <span>📚 Multiple Files</span>
+                        </label>
+                    </div>
+                    <div style="margin-top: 10px; font-size: 0.9em; color: #666;">
+                        <div id="singleModeDesc">Upload one Carpl file and one RIS file for analysis</div>
+                        <div id="multipleModeDesc" style="display: none;">Combine multiple Carpl files and RIS files from different time periods</div>
+                    </div>
+                </div>
+            </div>
+            
+            <form id="uploadForm">
+                <!-- Single File Mode -->
+                <div id="singleFileMode">
+                    <div class="form-group">
+                        <label for="lunitFile">Carpl Results File (Usually deployment_statsxxx.csv)</label>
+                        <div class="file-input-wrapper">
+                            <input type="file" id="lunitFile" name="lunit_file" accept=".csv,.xlsx,.xls" style="display: none;">
+                            <div class="file-input" onclick="document.getElementById('lunitFile').click()">
+                                <span>📊 Click to select Carpl file or drag & drop here</span>
+                            </div>
+                            <div id="lunitFileSelected" class="file-selected" style="display: none;"></div>
+                        </div>
+                        <div class="help-text">Supported formats: CSV, Excel (.xlsx, .xls)</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="gtFile">RIS Report File (Usually RIS_WeeklyReport_xxx.xls, password protected)</label>
+                        <div class="file-input-wrapper">
+                            <input type="file" id="gtFile" name="ground_truth_file" accept=".csv,.xlsx,.xls" style="display: none;">
+                            <div class="file-input" onclick="document.getElementById('gtFile').click()">
+                                <span>📋 Click to select RIS Report file or drag & drop here</span>
+                            </div>
+                            <div id="gtFileSelected" class="file-selected" style="display: none;"></div>
+                        </div>
+                        <div class="help-text">Supported formats: CSV, Excel (.xlsx, .xls)</div>
+                    </div>
+                </div>
+                
+                <!-- Multiple Files Mode -->
+                <div id="multipleFileMode" style="display: none;">
+                    <div class="form-group">
+                        <label for="lunitFiles">Carpl Results Files (Multiple deployment_statsxxx.csv files)</label>
+                        <div class="file-input-wrapper">
+                            <input type="file" id="lunitFiles" name="lunit_files" accept=".csv,.xlsx,.xls" multiple style="display: none;">
+                            <div class="file-input" onclick="document.getElementById('lunitFiles').click()">
+                                <span>📊 Click to select multiple Carpl files or drag & drop here</span>
+                            </div>
+                            <div id="lunitFilesSelected" class="file-selected" style="display: none;"></div>
+                        </div>
+                        <div class="help-text">Supported formats: CSV, Excel (.xlsx, .xls) - Hold Ctrl/Cmd to select multiple files</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="gtFiles">RIS Report Files (Multiple RIS_WeeklyReport_xxx.xls files)</label>
+                        <div class="file-input-wrapper">
+                            <input type="file" id="gtFiles" name="ground_truth_files" accept=".csv,.xlsx,.xls" multiple style="display: none;">
+                            <div class="file-input" onclick="document.getElementById('gtFiles').click()">
+                                <span>📋 Click to select multiple RIS Report files or drag & drop here</span>
+                            </div>
+                            <div id="gtFilesSelected" class="file-selected" style="display: none;"></div>
+                        </div>
+                        <div class="help-text">Supported formats: CSV, Excel (.xlsx, .xls) - Hold Ctrl/Cmd to select multiple files</div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="threshold">Priority Threshold (NOT WORKING YET)</label>
+                    <input type="number" id="threshold" name="priority_threshold" class="threshold-input" 
+                           value="50.0" min="0" max="100" step="0.1" disabled required>
+                    <div class="help-text">Threshold for binarizing Lunit scores (0-100)</div>
+                </div>
+                
+                <button type="submit" class="submit-btn" id="submitBtn">
+                    🚀 Start Analysis
+                </button>
+            </form>
+            
+            <div id="statusContainer" class="status-container">
+                <div id="statusMessage"></div>
+                <div class="progress-bar">
+                    <div id="progressFill" class="progress-fill"></div>
+                </div>
+                <div id="progressText"></div>
+            </div>
+            
+            <div id="resultsContainer" class="results-container">
+                <h3>📈 Analysis Results</h3>
+                <div id="resultsContent"></div>
+            </div>
+            
+            <div id="falseNegativesContainer" class="results-container" style="display: none;">
+                <h3>🔍 False Negative Cases</h3>
+                <div id="falseNegativesSummary" class="metric-summary"></div>
+                <div id="falseNegativesContent"></div>
+                <div class="download-buttons" style="margin-top: 15px;">
+                    <button onclick="downloadFalseNegatives()" class="submit-btn" style="width: auto; padding: 10px 20px; margin-right: 10px;">
+                        📥 Download False Negatives CSV
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:1221';
+        let currentTaskId = null;
+        let statusCheckInterval = null;
+        let currentUploadMode = 'single';
+
+        // Toggle between single and multiple file modes
+        function toggleUploadMode() {
+            const mode = document.querySelector('input[name="uploadMode"]:checked').value;
+            currentUploadMode = mode;
+            
+            const singleMode = document.getElementById('singleFileMode');
+            const multipleMode = document.getElementById('multipleFileMode');
+            const singleDesc = document.getElementById('singleModeDesc');
+            const multipleDesc = document.getElementById('multipleModeDesc');
+            
+            if (mode === 'single') {
+                singleMode.style.display = 'block';
+                multipleMode.style.display = 'none';
+                singleDesc.style.display = 'block';
+                multipleDesc.style.display = 'none';
+                // Clear multiple file selections
+                document.getElementById('lunitFiles').value = '';
+                document.getElementById('gtFiles').value = '';
+                document.getElementById('lunitFilesSelected').style.display = 'none';
+                document.getElementById('gtFilesSelected').style.display = 'none';
+            } else {
+                singleMode.style.display = 'none';
+                multipleMode.style.display = 'block';
+                singleDesc.style.display = 'none';
+                multipleDesc.style.display = 'block';
+                // Clear single file selections
+                document.getElementById('lunitFile').value = '';
+                document.getElementById('gtFile').value = '';
+                document.getElementById('lunitFileSelected').style.display = 'none';
+                document.getElementById('gtFileSelected').style.display = 'none';
+            }
+        }
+
+        // File input handling for single files
+        document.getElementById('lunitFile').addEventListener('change', function(e) {
+            handleSingleFileSelection(e.target, 'lunitFileSelected');
+        });
+
+        document.getElementById('gtFile').addEventListener('change', function(e) {
+            handleSingleFileSelection(e.target, 'gtFileSelected');
+        });
+
+        // File input handling for multiple files
+        document.getElementById('lunitFiles').addEventListener('change', function(e) {
+            handleMultipleFileSelection(e.target, 'lunitFilesSelected');
+        });
+
+        document.getElementById('gtFiles').addEventListener('change', function(e) {
+            handleMultipleFileSelection(e.target, 'gtFilesSelected');
+        });
+
+        function handleSingleFileSelection(input, displayId) {
+            const file = input.files[0];
+            const display = document.getElementById(displayId);
+            
+            if (file) {
+                display.innerHTML = `
+                    <div class="file-info">✅ ${file.name} (${formatFileSize(file.size)})</div>
+                    <button type="button" class="remove-file-btn" onclick="removeSingleFile('${input.id}', '${displayId}')">✕ Remove</button>
+                `;
+                display.style.display = 'block';
+            } else {
+                display.style.display = 'none';
+            }
+        }
+
+        function handleMultipleFileSelection(input, displayId) {
+            const files = input.files;
+            const display = document.getElementById(displayId);
+            
+            if (files.length > 0) {
+                let totalSize = 0;
+                let fileList = [];
+                
+                for (let i = 0; i < files.length; i++) {
+                    totalSize += files[i].size;
+                    fileList.push(`<div class="file-item"><span>${files[i].name}</span><span>${formatFileSize(files[i].size)}</span></div>`);
+                }
+                
+                const summary = `✅ ${files.length} file${files.length > 1 ? 's' : ''} selected (${formatFileSize(totalSize)})`;
+                
+                let fileListHtml;
+                if (files.length <= 5) {
+                    // Show all files if 5 or fewer
+                    fileListHtml = `<div class="file-list">${fileList.join('')}</div>`;
+                } else {
+                    // Show first 3 files and count for more
+                    const visibleFiles = fileList.slice(0, 3).join('');
+                    const remainingCount = files.length - 3;
+                    fileListHtml = `<div class="file-list">${visibleFiles}<div class="file-item" style="font-style: italic; color: #666;"><span>... and ${remainingCount} more files</span></div></div>`;
+                }
+                
+                display.innerHTML = `
+                    <div class="file-info">
+                        ${summary}
+                        ${fileListHtml}
+                    </div>
+                    <button type="button" class="remove-file-btn" onclick="removeMultipleFiles('${input.id}', '${displayId}')">✕ Remove All</button>
+                `;
+                
+                display.style.display = 'block';
+            } else {
+                display.style.display = 'none';
+            }
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // File removal functions
+        function removeSingleFile(inputId, displayId) {
+            const input = document.getElementById(inputId);
+            const display = document.getElementById(displayId);
+            
+            // Clear the file input
+            input.value = '';
+            
+            // Hide the display
+            display.style.display = 'none';
+            display.innerHTML = '';
+        }
+
+        function removeMultipleFiles(inputId, displayId) {
+            const input = document.getElementById(inputId);
+            const display = document.getElementById(displayId);
+            
+            // Clear the file input
+            input.value = '';
+            
+            // Hide the display
+            display.style.display = 'none';
+            display.innerHTML = '';
+        }
+
+        // Drag and drop functionality
+        function setupDragAndDrop(inputId, dropZone, isMultiple = false) {
+            const input = document.getElementById(inputId);
+            const zone = dropZone;
+
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                zone.addEventListener(eventName, preventDefaults, false);
+            });
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                zone.addEventListener(eventName, () => zone.classList.add('dragover'), false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                zone.addEventListener(eventName, () => zone.classList.remove('dragover'), false);
+            });
+
+            zone.addEventListener('drop', function(e) {
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    input.files = files;
+                    if (isMultiple) {
+                        handleMultipleFileSelection(input, inputId === 'lunitFiles' ? 'lunitFilesSelected' : 'gtFilesSelected');
+                    } else {
+                        handleSingleFileSelection(input, inputId === 'lunitFile' ? 'lunitFileSelected' : 'gtFileSelected');
+                    }
+                }
+            });
+        }
+
+        // Setup drag and drop for all file inputs
+        setupDragAndDrop('lunitFile', document.querySelector('.file-input'), false);
+        setupDragAndDrop('gtFile', document.querySelectorAll('.file-input')[1], false);
+        setupDragAndDrop('lunitFiles', document.querySelectorAll('.file-input')[2], true);
+        setupDragAndDrop('gtFiles', document.querySelectorAll('.file-input')[3], true);
+
+        // Form submission
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            if (currentUploadMode === 'single') {
+                // Single file mode
+                const lunitFile = document.getElementById('lunitFile').files[0];
+                const gtFile = document.getElementById('gtFile').files[0];
+                const threshold = document.getElementById('threshold').value;
+                
+                if (!lunitFile || !gtFile) {
+                    alert('Please select both files before submitting.');
+                    return;
+                }
+                
+                await uploadSingleFiles(lunitFile, gtFile, threshold);
+            } else {
+                // Multiple files mode
+                const lunitFiles = document.getElementById('lunitFiles').files;
+                const gtFiles = document.getElementById('gtFiles').files;
+                const threshold = document.getElementById('threshold').value;
+                
+                if (lunitFiles.length === 0 || gtFiles.length === 0) {
+                    alert('Please select at least one file for both Carpl and RIS categories before submitting.');
+                    return;
+                }
+                
+                await uploadMultipleFiles(lunitFiles, gtFiles, threshold);
+            }
+        });
+
+        async function uploadSingleFiles(lunitFile, gtFile, threshold) {
+            const formData = new FormData();
+            formData.append('lunit_file', lunitFile);
+            formData.append('ground_truth_file', gtFile);
+            formData.append('priority_threshold', threshold);
+            
+            // Update UI to show upload status
+            document.getElementById('submitBtn').disabled = true;
+            document.getElementById('submitBtn').textContent = '⏳ Uploading...';
+            
+            const statusContainer = document.getElementById('statusContainer');
+            statusContainer.className = 'status-container status-uploading';
+            statusContainer.style.display = 'block';
+            document.getElementById('statusMessage').textContent = '📤 Uploading files...';
+            updateProgress(0, 'Preparing upload...');
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/analyze`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                currentTaskId = result.task_id;
+                
+                // Start monitoring the task
+                startStatusMonitoring();
+                
+            } catch (error) {
+                showError(`Upload failed: ${error.message}`);
+            }
+        }
+
+        async function uploadMultipleFiles(lunitFiles, gtFiles, threshold) {
+            const formData = new FormData();
+            
+            // Append all lunit files
+            for (let i = 0; i < lunitFiles.length; i++) {
+                formData.append('lunit_files', lunitFiles[i]);
+            }
+            
+            // Append all ground truth files
+            for (let i = 0; i < gtFiles.length; i++) {
+                formData.append('ground_truth_files', gtFiles[i]);
+            }
+            
+            formData.append('priority_threshold', threshold);
+            
+            // Update UI to show upload status
+            document.getElementById('submitBtn').disabled = true;
+            document.getElementById('submitBtn').textContent = '⏳ Uploading...';
+            
+            const statusContainer = document.getElementById('statusContainer');
+            statusContainer.className = 'status-container status-uploading';
+            statusContainer.style.display = 'block';
+            document.getElementById('statusMessage').textContent = `📤 Uploading ${lunitFiles.length + gtFiles.length} files...`;
+            updateProgress(0, 'Preparing upload...');
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/analyze-multiple`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                currentTaskId = result.task_id;
+                
+                // Start monitoring the task
+                startStatusMonitoring();
+                
+            } catch (error) {
+                showError(`Upload failed: ${error.message}`);
+            }
+        }
+
+        function startStatusMonitoring() {
+            updateProgress(10, 'Upload complete, starting analysis...');
+            
+            const statusContainer = document.getElementById('statusContainer');
+            statusContainer.className = 'status-container status-processing';
+            document.getElementById('statusMessage').textContent = '🔄 Processing files...';
+            
+            statusCheckInterval = setInterval(checkStatus, 2000);
+        }
+
+        async function checkStatus() {
+            if (!currentTaskId) return;
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/status/${currentTaskId}`);
+                const status = await response.json();
+                
+                updateProgress(getProgressPercentage(status.status), status.progress || 'Processing...');
+                
+                if (status.status === 'completed') {
+                    clearInterval(statusCheckInterval);
+                    await fetchResults();
+                } else if (status.status === 'failed') {
+                    clearInterval(statusCheckInterval);
+                    showError(`Processing failed: ${status.error || 'Unknown error'}`);
+                }
+                
+            } catch (error) {
+                console.error('Status check failed:', error);
+            }
+        }
+
+        function getProgressPercentage(status) {
+            switch (status) {
+                case 'queued': return 15;
+                case 'processing': return 50;
+                case 'completed': return 100;
+                case 'failed': return 0;
+                default: return 25;
+            }
+        }
+
+        async function fetchResults() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/results/${currentTaskId}`);
+                const results = await response.json();
+                
+                // Store results globally for download functionality
+                currentResults = results;
+                
+                showResults(results);
+                
+            } catch (error) {
+                showError(`Failed to fetch results: ${error.message}`);
+            }
+        }
+
+        function showResults(results) {
+            const statusContainer = document.getElementById('statusContainer');
+            statusContainer.className = 'status-container status-completed';
+            document.getElementById('statusMessage').textContent = '✅ Analysis completed successfully!';
+            updateProgress(100, 'Analysis complete');
+            
+            const resultsContainer = document.getElementById('resultsContainer');
+            const resultsContent = document.getElementById('resultsContent');
+            
+            // Display the text report
+            resultsContent.innerHTML = `
+                <div style="margin-bottom: 30px;">
+                    <h4 style="color: #495057; margin-bottom: 15px; border-bottom: 2px solid #007bff; padding-bottom: 5px;">📄 Analysis Report</h4>
+                    <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 4px solid #007bff; white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 0.9em; line-height: 1.4; color: #495057; max-height: 400px; overflow-y: auto;">${results.txt_report || 'No text report available'}</div>
+                </div>
+                
+                <div style="margin-top: 20px;">
+                    <h4 style="color: #495057; margin-bottom: 15px; border-bottom: 2px solid #28a745; padding-bottom: 5px;">📊 Data Summary</h4>
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #28a745;">
+                        <div class="metric">
+                            <span class="metric-label">Total Records Processed:</span>
+                            <span class="metric-value">${results.data_output ? results.data_output.length : 'N/A'}</span>
+                        </div>
+                        ${results.data_output && results.data_output.length > 0 ? `
+                        <div class="metric">
+                            <span class="metric-label">Sample Record Keys:</span>
+                            <span class="metric-value" style="font-size: 0.8em;">${Object.keys(results.data_output[0]).slice(0, 5).join(', ')}${Object.keys(results.data_output[0]).length > 5 ? '...' : ''}</span>
+                        </div>
+                        ` : ''}
+                        ${results.csv_data ? `
+                        <div class="metric">
+                            <span class="metric-label">CSV Data Size:</span>
+                            <span class="metric-value">${(results.csv_data.length / 1024).toFixed(1)} KB</span>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+                
+                ${results.csv_data ? `
+                <div style="margin-top: 20px;">
+                    <h4 style="color: #495057; margin-bottom: 15px; border-bottom: 2px solid #6f42c1; padding-bottom: 5px;">📋 CSV Data Preview</h4>
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #6f42c1;">
+                        <div style="background: white; padding: 10px; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 0.8em; overflow-x: auto; max-height: 200px; overflow-y: auto; border: 1px solid #dee2e6;">
+                            ${results.csv_data.split('\\n').slice(0, 10).join('\\n')}
+                            ${results.csv_data.split('\\n').length > 10 ? '\\n... (showing first 10 rows)' : ''}
+                        </div>
+                    </div>
+                </div>
+                ` : ''}
+                
+                <div style="margin-top: 20px; text-align: center; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                    <button onclick="downloadResults()" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold;">📥 Download JSON Results</button>
+                    ${results.csv_data ? `
+                    <button onclick="downloadCSV()" style="background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold;">📊 Download CSV Data</button>
+                    ` : ''}
+                </div>
+            `;
+            
+            resultsContainer.style.display = 'block';
+            
+            // Display false negatives if available
+            if (results.false_negatives && results.false_negatives.summary) {
+                showFalseNegatives(results.false_negatives);
+            }
+            
+            // Reset form
+            document.getElementById('submitBtn').disabled = false;
+            document.getElementById('submitBtn').textContent = '🚀 Start New Analysis';
+        }
+
+        function showFalseNegatives(falseNegativesData) {
+            const falseNegativesContainer = document.getElementById('falseNegativesContainer');
+            const falseNegativesSummary = document.getElementById('falseNegativesSummary');
+            const falseNegativesContent = document.getElementById('falseNegativesContent');
+            
+            const summary = falseNegativesData.summary;
+            
+            // Display summary
+            falseNegativesSummary.innerHTML = `
+                <h4 style="margin: 0 0 10px 0; color: #856404;">📊 False Negative Summary</h4>
+                <p style="margin: 5px 0;"><strong>Total Cases:</strong> ${summary.count} out of ${summary.total_cases} (${summary.percentage.toFixed(1)}%)</p>
+                <p style="margin: 5px 0; font-style: italic;">${summary.description}</p>
+            `;
+            
+            // Display false negative cases in a table
+            if (falseNegativesData.data && falseNegativesData.data.length > 0) {
+                const cases = falseNegativesData.data;
+                let tableHTML = `
+                    <div class="false-negative-table">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Site/Location</th>
+                                    <th>Report</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                
+                cases.slice(0, 50).forEach(caseData => { // Limit to first 50 cases for display
+                    const reportText = caseData.TEXT_REPORT || 'N/A';
+                    
+                    tableHTML += `
+                        <tr>
+                            <td>${caseData.MEDICAL_LOCATION_NAME || 'N/A'}</td>
+                            <td style="max-width: 400px; word-wrap: break-word;">${reportText}</td>
+                        </tr>
+                    `;
+                });
+                
+                tableHTML += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                
+                if (cases.length > 50) {
+                    tableHTML += `<p style="margin-top: 10px; font-style: italic; color: #666;">Showing first 50 cases. Download CSV for complete data.</p>`;
+                }
+                
+                falseNegativesContent.innerHTML = tableHTML;
+            } else {
+                falseNegativesContent.innerHTML = `<p style="color: #28a745; font-weight: bold;">🎉 No false negative cases found!</p>`;
+            }
+            
+            falseNegativesContainer.style.display = 'block';
+        }
+
+        function showError(message) {
+            const statusContainer = document.getElementById('statusContainer');
+            statusContainer.className = 'status-container status-error';
+            document.getElementById('statusMessage').innerHTML = `❌ Error: ${message}`;
+            updateProgress(0, 'Error occurred');
+            
+            document.getElementById('submitBtn').disabled = false;
+            document.getElementById('submitBtn').textContent = '🚀 Start Analysis';
+            
+            if (statusCheckInterval) {
+                clearInterval(statusCheckInterval);
+            }
+        }
+
+        function updateProgress(percentage, text) {
+            document.getElementById('progressFill').style.width = `${percentage}%`;
+            document.getElementById('progressText').textContent = text;
+        }
+
+        // Global variable to store current results for download
+        let currentResults = null;
+
+        function downloadResults() {
+            if (!currentResults) {
+                alert('No results available for download');
+                return;
+            }
+            
+            // Create downloadable content
+            const downloadData = {
+                txt_report: currentResults.txt_report,
+                data_output: currentResults.data_output,
+                csv_data: currentResults.csv_data,
+                download_timestamp: new Date().toISOString(),
+                task_id: currentTaskId
+            };
+            
+            // Create and download file
+            const dataStr = JSON.stringify(downloadData, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            
+            // Use filename from API results or fallback to timestamp
+            const baseFilename = currentResults.filename || `cxr_analysis_results_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}`;
+            const exportFileDefaultName = `${baseFilename}.json`;
+            
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+        }
+
+        function downloadCSV() {
+            if (!currentResults || !currentResults.csv_data) {
+                alert('No CSV data available for download');
+                return;
+            }
+            
+            // Create and download CSV file
+            const dataUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(currentResults.csv_data);
+            
+            // Use filename from API results or fallback to timestamp
+            const baseFilename = currentResults.filename || `cxr_analysis_data_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}`;
+            const exportFileDefaultName = `${baseFilename}.csv`;
+            
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+        }
+
+        function downloadFalseNegatives() {
+            if (!currentResults || !currentResults.false_negatives || !currentResults.false_negatives.csv_data) {
+                alert('No false negative data available for download');
+                return;
+            }
+            
+            // Create and download false negatives CSV file
+            const dataUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(currentResults.false_negatives.csv_data);
+            
+            // Use filename from API results or fallback to timestamp
+            const baseFilename = currentResults.filename || `cxr_analysis_false_negatives_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}`;
+            const exportFileDefaultName = `${baseFilename}_false_negatives.csv`;
+            
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+        }
+    </script>
+</body>
+</html>
