@@ -4,7 +4,6 @@ import numpy as np
 import os
 import re
 import json
-from telegram_notifier import Notifier
 from statsmodels.stats.contingency_tables import mcnemar
 from sklearn.metrics import confusion_matrix, accuracy_score, cohen_kappa_score
 
@@ -15,15 +14,6 @@ from sklearn.metrics import confusion_matrix, accuracy_score, cohen_kappa_score
 from open_protected_xlsx import open_protected_xlsx
 from cxr_audit.lib_audit_cxr_v2 import CXRClassifier
 from cxr_audit.grade_batch_async import BatchCXRProcessor
-
-# Telegram notifier
-bot_token = '1039031996:AAGu-1B3kUi-pJcDD-1SeARze-oBxMmdp-k'
-chat_id = '-410738508'
-
-# Temporarily set the TELEGRAM_CHAT_ID environment variable
-os.environ["TELEGRAM_CHAT_ID"] = chat_id
-os.environ["TELEGRAM_TOKEN"] = bot_token
-telegram_notifier = Notifier()
 
 # Load semialgo data
 with open("padchest_op.json", "r") as f:
