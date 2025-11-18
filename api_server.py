@@ -14,6 +14,7 @@ from datetime import datetime
 
 # Import your existing class
 from class_process_carpl import ProcessCarpl
+from open_protected_xlsx import open_protected_xlsx
 
 app = FastAPI(
     title="CXR Analysis API",
@@ -58,6 +59,8 @@ def save_uploaded_file(upload_file: UploadFile) -> str:
     """Save uploaded file to temporary location and return path"""
     try:
         # Create temporary file with proper extension
+        if not upload_file.filename:
+            raise HTTPException(status_code=400, detail="File must have a filename")
         suffix = os.path.splitext(upload_file.filename)[1]
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
             content = upload_file.file.read()
@@ -68,6 +71,49 @@ def save_uploaded_file(upload_file: UploadFile) -> str:
         return tmp_file_path
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error saving file: {str(e)}")
+    
+async def sort_files_async(file_paths: List[str]) -> Dict[str, List[str]]:
+    """Sort uploaded files into GE (Excel) and CARPL (CSV) categories"""
+    ge_file_paths = []
+    carpl_file_paths = []
+    
+    for file_path in file_paths:
+        ext = os.path.splitext(file_path)[1].lower()
+        if ext in ['.xlsx', '.xls']:
+            # Attempt to open with protected Excel handler
+            try:
+                df = open_protected_xlsx(file_path, password="GE_2024_P@55")
+                # Verify the Excel file has required columns
+                if not {'ACCESSION_NO', 'TEXT_REPORT'}.issubset(df.columns):
+                    missing_cols = {'ACCESSION_NO', 'TEXT_REPORT'} - set(df.columns)
+                    raise HTTPException(status_code=400, detail=f"GE file {os.path.basename(file_path)} is missing required columns: {missing_cols}")
+                ge_file_paths.append(file_path)
+                print(f"Successfully identified GE file: {os.path.basename(file_path)}")
+            except Exception as e:
+                print(f"Failed to open Excel file {file_path}: {str(e)}")
+                raise HTTPException(status_code=400, detail=f"Error opening GE file {os.path.basename(file_path)}: {str(e)}")
+        elif ext == '.csv':
+            try:
+                df = pd.read_csv(file_path)
+                # Verify the CSV file has required columns
+                if not {'ACCESSION_NO', "Atelectasis", "Calcification", "Cardiomegaly", "Consolidation", "Fibrosis", "Mediastinal Widening", \
+                            "Nodule", "Pleural Effusion", "Pneumoperitoneum", "Pneumothorax", "Tuberculosis"}.issubset(df.columns):
+                    missing_cols = {'ACCESSION_NO', "Atelectasis", "Calcification", "Cardiomegaly", "Consolidation", "Fibrosis", "Mediastinal Widening", \
+                                    "Nodule", "Pleural Effusion", "Pneumoperitoneum", "Pneumothorax", "Tuberculosis"} - set(df.columns)
+                    raise HTTPException(status_code=400, detail=f"CARPL file {os.path.basename(file_path)} is missing required columns: {missing_cols}")
+                carpl_file_paths.append(file_path)
+                print(f"Successfully identified CARPL file: {os.path.basename(file_path)}")
+            except Exception as e:
+                print(f"Failed to open CSV file {file_path}: {str(e)}")
+                raise HTTPException(status_code=400, detail=f"Error opening CARPL file {os.path.basename(file_path)}: {str(e)}")
+        else:
+            raise HTTPException(status_code=400, detail=f"Unsupported file type: {os.path.basename(file_path)}")
+
+    return {
+        "ge_file_paths": ge_file_paths,
+        "carpl_file_paths": carpl_file_paths
+    }
+
 
 async def process_files_async(task_id: str, carpl_file_paths: List[str], ge_file_paths: List[str], 
                              priority_threshold: float = 50.0):
@@ -75,17 +121,21 @@ async def process_files_async(task_id: str, carpl_file_paths: List[str], ge_file
     try:
         # Update status to processing
         processing_results[task_id]["status"] = "processing"
-        processing_results[task_id]["progress"] = "Initializing ProcessCarpl..."
+        processing_results[task_id]["progress"] = f"Initializing ProcessCarpl with {len(carpl_file_paths)} CARPL files and {len(ge_file_paths)} GE files..."
         
         # Initialize processor with multiple file paths
         processor = ProcessCarpl(carpl_file_paths, ge_file_paths)
         
-        print("Starting task:", task_id)
+        print(f"Starting task {task_id} with {len(carpl_file_paths)} CARPL files and {len(ge_file_paths)} GE files")
 
         # Run the pipeline
         # For this API, we'll run the pipeline manually as we want to collate the text
+        # It runs around 2 reports/second on my machine (2.2-2.5 it/s)
         df_merged = processor.load_reports()
-        processing_results[task_id]["progress"] = f"Loaded {len(df_merged)} reports"
+        total_seconds = len(df_merged) / 2  # 2 reports per second
+        minutes = int(total_seconds // 60)
+        seconds = int(total_seconds % 60)
+        processing_results[task_id]["progress"] = f"Loaded {len(df_merged)} reports. This may take around {minutes} minutes and {seconds} seconds to complete."
         initial_metrics = processor.txt_initial_metrics(df_merged)
         
         df_merged = processor.process_stats_accuracy(df_merged)
@@ -167,6 +217,11 @@ async def analyze_files(
     
     # Validate file types
     allowed_extensions = {'.csv', '.xlsx', '.xls'}
+    
+    if not lunit_file.filename:
+        raise HTTPException(status_code=400, detail="Lunit file must have a filename")
+    if not ground_truth_file.filename:
+        raise HTTPException(status_code=400, detail="Ground truth file must have a filename")
     
     lunit_ext = os.path.splitext(lunit_file.filename)[1].lower()
     gt_ext = os.path.splitext(ground_truth_file.filename)[1].lower()
@@ -335,6 +390,93 @@ async def delete_task(task_id: str):
     del processing_results[task_id]
     return {"message": "Task deleted successfully"}
 
+@app.post("/analyze-auto-sort", response_model=ProcessingResponse)
+async def analyze_auto_sort_files(
+    background_tasks: BackgroundTasks,
+    files: List[UploadFile] = File(..., description="Mixed files (will be auto-sorted into Lunit/GE categories)"),
+    priority_threshold: float = 50.0
+):
+    """
+    Upload mixed files and automatically sort them into Lunit (CSV) and GE (Excel) categories for analysis.
+    
+    - **files**: List of mixed CSV or Excel files (will be automatically categorized)
+    - **priority_threshold**: Threshold for binarizing Lunit scores (default: 50.0)
+    """
+    
+    # Generate unique task ID
+    task_id = str(uuid.uuid4())
+    
+    # Save uploaded files
+    try:
+        all_file_paths = []
+        for file in files:
+            if not file.filename:
+                raise HTTPException(status_code=400, detail="All files must have filenames")
+            file_path = save_uploaded_file(file)
+            all_file_paths.append(file_path)
+            
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error processing uploaded files: {str(e)}")
+    
+    # Initialize task status
+    processing_results[task_id] = {
+        "task_id": task_id,
+        "status": "queued",
+        "progress": "Files uploaded successfully, sorting files...",
+        "results": None,
+        "error": None,
+        "created_at": datetime.now().isoformat(),
+        "completed_at": None,
+        "files": {
+            "uploaded_filenames": [f.filename for f in files]
+        }
+    }
+    
+    # Sort files and start background processing
+    try:
+        file_sorting = await sort_files_async(all_file_paths)
+        carpl_file_paths = file_sorting["carpl_file_paths"]
+        ge_file_paths = file_sorting["ge_file_paths"]
+        
+        # Update task status with sorting results
+        processing_results[task_id]["progress"] = f"Files sorted: {len(carpl_file_paths)} CARPL (CSV), {len(ge_file_paths)} GE (Excel)"
+        processing_results[task_id]["files"]["sorted_files"] = {
+            "carpl_count": len(carpl_file_paths),
+            "ge_count": len(ge_file_paths)
+        }
+        
+        if not carpl_file_paths:
+            raise HTTPException(status_code=400, detail="No CARPL (CSV) files found in uploaded files")
+        if not ge_file_paths:
+            raise HTTPException(status_code=400, detail="No GE (Excel) files found in uploaded files")
+        
+        # Start background processing
+        background_tasks.add_task(
+            process_files_async, 
+            task_id, 
+            carpl_file_paths,
+            ge_file_paths,
+            priority_threshold
+        )
+        
+    except Exception as e:
+        processing_results[task_id]["status"] = "failed"
+        processing_results[task_id]["error"] = str(e)
+        processing_results[task_id]["completed_at"] = datetime.now().isoformat()
+        # Clean up files on error
+        try:
+            for file_path in all_file_paths:
+                os.unlink(file_path)
+        except:
+            pass
+        raise HTTPException(status_code=400, detail=str(e))
+    
+    return ProcessingResponse(
+        task_id=task_id,
+        status="queued",
+        message=f"Files uploaded and sorted successfully ({len(carpl_file_paths)} CARPL, {len(ge_file_paths)} GE). Processing started in background."
+    )
+
 @app.get("/tasks")
 async def list_tasks():
     """List all tasks with their current status"""
@@ -360,6 +502,7 @@ async def root():
         "endpoints": {
             "analyze": "POST /analyze - Upload single files for analysis",
             "analyze-multiple": "POST /analyze-multiple - Upload multiple files for analysis",
+            "analyze-auto-sort": "POST /analyze-auto-sort - Upload mixed files (auto-sorted into categories)",
             "status": "GET /status/{task_id} - Check processing status",
             "results": "GET /results/{task_id} - Get analysis results",
             "tasks": "GET /tasks - List all tasks",
