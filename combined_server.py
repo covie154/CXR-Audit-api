@@ -25,6 +25,25 @@ import time
 from class_process_carpl import ProcessCarpl
 from open_protected_xlsx import open_protected_xlsx
 
+thresholds = {
+    'default': {
+        'Atelectasis': 10,
+        'Calcification': 10,
+        'Cardiomegaly': 10,
+        'Consolidation': 10,
+        'Fibrosis': 10,
+        'Mediastinal Widening': 10,
+        'Nodule': 15,
+        'Pleural Effusion': 10,
+        'Pneumoperitoneum': 10,
+        'Pneumothorax': 10,
+        'Tuberculosis': 999
+    },
+    'YIS': {
+        'Nodule': 5
+    }
+}
+
 # ================================
 # API SERVER (Port 1221)
 # ================================
@@ -96,15 +115,19 @@ async def sort_files_async(file_paths: List[str]) -> Dict[str, List[str]]:
             # Attempt to open with protected Excel handler
             try:
                 df = open_protected_xlsx(file_path, password="GE_2024_P@55")
+            except Exception as e:
+                try:
+                    df = pd.read_excel(file_path)
+                except Exception as e2:
+                    print(f"Failed to open Excel file {file_path}: {str(e2)}")
+                    raise HTTPException(status_code=400, detail=f"Error opening GE file {os.path.basename(file_path)}: {str(e2)}")
+            finally:
                 # Verify the Excel file has required columns
                 if not {'ACCESSION_NO', 'TEXT_REPORT'}.issubset(df.columns):
                     missing_cols = {'ACCESSION_NO', 'TEXT_REPORT'} - set(df.columns)
                     raise HTTPException(status_code=400, detail=f"GE file {os.path.basename(file_path)} is missing required columns: {missing_cols}")
                 ge_file_paths.append(file_path)
                 print(f"Successfully identified GE file: {os.path.basename(file_path)}")
-            except Exception as e:
-                print(f"Failed to open Excel file {file_path}: {str(e)}")
-                raise HTTPException(status_code=400, detail=f"Error opening GE file {os.path.basename(file_path)}: {str(e)}")
         elif ext == '.csv':
             try:
                 df = pd.read_csv(file_path)
@@ -136,7 +159,7 @@ async def process_files_async(task_id: str, carpl_file_paths: List[str], ge_file
         processing_results[task_id]["progress"] = "Initializing ProcessCarpl..."
         
         # Initialize processor with multiple file paths
-        processor = ProcessCarpl(carpl_file_paths, ge_file_paths)
+        processor = ProcessCarpl(carpl_file_paths, ge_file_paths, priority_threshold=thresholds)
         
         print("Starting task:", task_id)
 

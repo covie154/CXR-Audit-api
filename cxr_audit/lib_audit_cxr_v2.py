@@ -532,3 +532,32 @@ class CXRClassifier():
         
         # Always return the Series, regardless of log_level
         return return_result
+    
+    ######## END CLASS ########
+    
+    #############################################
+    ### SUPPLEMENT: LUNIT FINDINGS EXTRACTION ###
+    #############################################
+
+    def gradeLunit(self, rpt):
+        """
+        Extract Lunit-specific findings from a chest X-ray report.
+        This supplemental method is designed to extract findings in a format
+        compatible with Lunit AI analysis systems.
+        
+        Args:
+            rpt (str): The chest X-ray report text to analyze.
+        
+        Returns:
+            dict: A JSON object containing the Lunit findings extraction results.
+        """
+        subs = {
+            'rpt': rpt
+        }
+        prompt_grade_chat_msg = self.create_chat_message(
+            role="user", 
+            content=prompts.prompt_get_lunit_findings.substitute(subs)
+        )
+        messages_lst = [self.sys_role_chat_msg, prompt_grade_chat_msg]
+
+        return getLLMJSON(messages_lst, self.client, self.model_name, prompts.LunitFindings)

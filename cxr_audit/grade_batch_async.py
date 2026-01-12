@@ -152,6 +152,17 @@ class BatchCXRProcessor:
                 'judge_reasoning_ext': ''
             }
     
+    def _process_single_report_lunit(self, report_text: str, index: int) -> Tuple[int, Dict]:
+        """Process a single report using Lunit extraction method."""
+        try:
+            time.sleep(self.rate_limit_delay)  # Rate limiting
+            classifier = self._get_classifier()
+            result = classifier.gradeLunit(report_text)
+            return index, result
+        except Exception as e:
+            print(f"Error processing report {index} (Lunit): {e}")
+            return index, {}
+    
     def process_semialgo_batch(self, df: pd.DataFrame, report_column: str = 'REPORT') -> pd.DataFrame:
         """
         Process a batch of reports using semi-algorithmic method concurrently.
@@ -332,17 +343,60 @@ class BatchCXRProcessor:
         
         return df_result
     
-    def process_full_pipeline(self, df: pd.DataFrame, report_column: str = 'REPORT',
-                            steps: List[str] = ['semialgo', 'hybrid', 'llm', 'judge'],
-                            save_intermediate: bool = True, gt_present: bool = False, output_dir: str = './') -> pd.DataFrame:
+    def process_lunit_batch(self, df: pd.DataFrame, report_column: str = 'REPORT') -> pd.DataFrame:
         """
-        Process the full pipeline: semialgo -> hybrid -> LLM -> judge
+        Process a batch of reports using Lunit extraction method concurrently.
         
         Args:
             df: DataFrame containing reports
             report_column: Name of the column containing report text
-            steps: List of processing steps to apply
+            
+        Returns:
+            DataFrame with added Lunit findings column
+        """
+        print(f"Processing {len(df)} reports with Lunit extraction method using {self.max_workers} workers...")
+        
+        df_result = df.copy()
+        results = {}
+        
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            # Submit all tasks
+            future_to_index = {
+                executor.submit(self._process_single_report_lunit, row[report_column], idx): idx 
+                for idx, row in df.iterrows()
+            }
+            
+            # Collect results with progress bar
+            for future in tqdm(as_completed(future_to_index), total=len(future_to_index), desc="Supplemental processing"):
+                try:
+                    index, result = future.result()
+                    results[index] = result
+                except Exception as e:
+                    index = future_to_index[future]
+                    print(f"Error in future for index {index}: {e}")
+                    results[index] = {'atelectasis_llm': False, 'calcification_llm': False, 'cardiomegaly_llm': False, 'consolidation_llm': False, 
+                                      'fibrosis_llm': False, 'mediastinal_widening_llm': False, 'nodule_llm': False, 'pleural_effusion_llm': False, 
+                                      'pneumoperitoneum_llm': False, 'pneumothorax_llm': False, 'tb': False}
+        
+        # Add results to dataframe - columns = 'atelectasis_llm', 'tb'
+        for column in ['atelectasis_llm', 'calcification_llm', 'cardiomegaly_llm', 'consolidation_llm', 'fibrosis_llm', 'mediastinal_widening_llm', 
+                       'nodule_llm', 'pleural_effusion_llm', 'pneumoperitoneum_llm', 'pneumothorax_llm', 'tb']:
+            df_result[column] = [results.get(idx, {}).get(column, '') for idx in df.index]
+            
+        return df_result
+    
+    def process_full_pipeline(self, df: pd.DataFrame, report_column: str = 'REPORT',
+                            steps: List[str] = ['semialgo', 'hybrid', 'llm', 'judge','lunit'],
+                            save_intermediate: bool = True, gt_present: bool = False, output_dir: str = './') -> pd.DataFrame:
+        """
+        Process the full pipeline: semialgo -> hybrid -> LLM -> judge -> lunit
+        
+        Args:
+            df: DataFrame containing reports
+            report_column: Name of the column containing report text
+            steps: List of processing steps to apply (can include: 'semialgo', 'hybrid', 'llm', 'judge', 'lunit')
             save_intermediate: Whether to save intermediate results
+            gt_present: Whether ground truth data is present
             output_dir: Directory to save intermediate files
             
         Returns:
@@ -350,7 +404,7 @@ class BatchCXRProcessor:
         """
         print("Starting full CXR processing pipeline...")
         # Validate steps parameter
-        valid_steps = {'semialgo', 'hybrid', 'llm', 'judge'}
+        valid_steps = {'semialgo', 'hybrid', 'llm', 'judge', 'lunit'}
         invalid_steps = set(steps) - valid_steps
         if invalid_steps:
             raise ValueError(f"Invalid steps: {invalid_steps}. Valid steps are: {valid_steps}")
@@ -403,6 +457,13 @@ class BatchCXRProcessor:
             else:
                 if all(col in df_processed.columns for col in ['priority_algo', 'priority_llm']):
                     df_processed = self.process_judge_batch(df_processed, report_column, manual_column=None)
+        
+        # Step 5: Lunit extraction (supplemental)
+        if 'lunit' in steps:
+            print("\n=== Step 5: Lunit Extraction (Supplemental) ===")
+            df_processed = self.process_lunit_batch(df_processed, report_column)
+            if save_intermediate:
+                df_processed.to_csv(os.path.join(output_dir, 'intermediate_lunit.csv'), index=False)
         
         end_time = time.time()
         print(f"\n=== Pipeline Complete ===")

@@ -211,6 +211,61 @@ ${rpt}
 
 class cxrGrade(BaseModel):
     grade: int
+    
+
+# SUPPLEMENT: LUNIT FINDINGS INCL TB
+prompt_get_lunit_findings = Template('''# Your Task
+Below is a sample of an X-ray report, enclosed in <report> tags. \
+It has already been graded as "abnormal". Your job is instead to output whether specific findings are present or absent.
+If the finding is in one of the following categories, please indicate <finding>_llm = true.
+The categories are:
+- Atelectasis
+- Calcification
+- Cardiomegaly
+- Consolidation
+- Fibrosis
+- Mediastinal Widening
+- Nodule
+- Pleural Effusion
+- Pneumoperitoneum
+- Pneumothorax
+
+If the finding is tuberculosis, please indicate tb = true.
+
+# Output format
+Please provide your answer in a valid JSON with the following format:
+{
+    "atelectasis_llm": bool,
+    "calcification_llm": bool,
+    "cardiomegaly_llm": bool,
+    "consolidation_llm": bool,
+    "fibrosis_llm": bool,
+    "mediastinal_widening_llm": bool,
+    "nodule_llm": bool,
+    "pleural_effusion_llm": bool,
+    "pneumoperitoneum_llm": bool,
+    "pneumothorax_llm": bool,
+    "tb": bool
+}
+
+# Report to analyse
+<report>
+${rpt}
+</report>
+''')
+
+class LunitFindings(BaseModel):
+    atelectasis_llm: bool
+    calcification_llm: bool
+    cardiomegaly_llm: bool
+    consolidation_llm: bool
+    fibrosis_llm: bool
+    mediastinal_widening_llm: bool
+    nodule_llm: bool
+    pleural_effusion_llm: bool
+    pneumoperitoneum_llm: bool
+    pneumothorax_llm: bool
+    tb: bool
 
 ################################
 ### METHOD 3: HYBRID GRADING ###

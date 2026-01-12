@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CXR Analysis - File Upload</title>
+    <link rel="icon" type="image/png" href="favicon.png">
     <style>
         * {
             margin: 0;
@@ -119,21 +120,6 @@
         
         .file-info {
             flex: 1;
-        }
-        
-        .threshold-input {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #ddd;
-            border-radius: 8px;
-            font-size: 1em;
-            transition: border-color 0.3s ease;
-        }
-        
-        .threshold-input:focus {
-            outline: none;
-            border-color: #4facfe;
-            box-shadow: 0 0 10px rgba(79, 172, 254, 0.3);
         }
         
         .submit-btn {
@@ -379,24 +365,24 @@
                 <div class="mode-toggle">
                     <div style="display: flex; gap: 15px; align-items: center;">
                         <label style="display: flex; align-items: center; cursor: pointer;">
-                            <input type="radio" name="uploadMode" value="single" checked onchange="toggleUploadMode()" style="margin-right: 8px;">
+                            <input type="radio" name="uploadMode" value="single" onchange="toggleUploadMode()" style="margin-right: 8px;">
                             <span>🗂️ Single Files</span>
                         </label>
                         <label style="display: flex; align-items: center; cursor: pointer;">
-                            <input type="radio" name="uploadMode" value="multiple" onchange="toggleUploadMode()" style="margin-right: 8px;">
+                            <input type="radio" name="uploadMode" value="multiple" checked onchange="toggleUploadMode()" style="margin-right: 8px;">
                             <span>📚 Multiple Files</span>
                         </label>
                     </div>
                     <div style="margin-top: 10px; font-size: 0.9em; color: #666;">
-                        <div id="singleModeDesc">Upload one Carpl file and one RIS file for analysis</div>
-                        <div id="multipleModeDesc" style="display: none;">Combine multiple Carpl files and RIS files from different time periods</div>
+                        <div id="singleModeDesc" style="display: none;">Upload one Carpl file and one RIS file for analysis</div>
+                        <div id="multipleModeDesc">Combine multiple Carpl files and RIS files from different time periods</div>
                     </div>
                 </div>
             </div>
             
             <form id="uploadForm">
                 <!-- Single File Mode -->
-                <div id="singleFileMode">
+                <div id="singleFileMode" style="display: none;">
                     <div class="form-group">
                         <label for="lunitFile">Carpl Results File (Usually deployment_statsxxx.csv)</label>
                         <div class="file-input-wrapper">
@@ -423,7 +409,7 @@
                 </div>
                 
                 <!-- Multiple Files Mode -->
-                <div id="multipleFileMode" style="display: none;">
+                <div id="multipleFileMode">
                     <div class="form-group">
                         <label for="lunitFiles">Carpl Results Files (Multiple deployment_statsxxx.csv files)</label>
                         <div class="file-input-wrapper">
@@ -450,10 +436,17 @@
                 </div>
                 
                 <div class="form-group">
-                    <label for="threshold">Priority Threshold (NOT WORKING YET)</label>
-                    <input type="number" id="threshold" name="priority_threshold" class="threshold-input" 
-                           value="50.0" min="0" max="100" step="0.1" disabled required>
-                    <div class="help-text">Threshold for binarizing Lunit scores (0-100)</div>
+                    <label for="supplementalSteps">🔬 Supplemental Processing</label>
+                    <div class="mode-toggle" style="padding: 10px;">
+                        <label style="display: flex; align-items: center; cursor: pointer;">
+                            <input type="checkbox" id="supplementalSteps" name="supplemental_steps" style="width: 20px; height: 20px; margin-right: 10px;">
+                            <span>Enable detailed per-finding LLM extraction</span>
+                        </label>
+                    </div>
+                    <div class="help-text" style="color: #856404; background: #fff3cd; padding: 8px; border-radius: 4px; margin-top: 5px;">
+                        ⚠️ Warning: This will significantly increase processing time (~10 seconds per report). 
+                        Only enable if you need individual finding extractions (atelectasis_llm, cardiomegaly_llm, etc.)
+                    </div>
                 </div>
                 
                 <button type="submit" class="submit-btn" id="submitBtn">
@@ -491,7 +484,7 @@
         const API_BASE_URL = 'http://localhost:1221';
         let currentTaskId = null;
         let statusCheckInterval = null;
-        let currentUploadMode = 'single';
+        let currentUploadMode = 'multiple';
 
         // Toggle between single and multiple file modes
         function toggleUploadMode() {
@@ -677,38 +670,39 @@
         document.getElementById('uploadForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
+            // Get supplemental steps checkbox value
+            const supplementalSteps = document.getElementById('supplementalSteps').checked;
+            
             if (currentUploadMode === 'single') {
                 // Single file mode
                 const lunitFile = document.getElementById('lunitFile').files[0];
                 const gtFile = document.getElementById('gtFile').files[0];
-                const threshold = document.getElementById('threshold').value;
                 
                 if (!lunitFile || !gtFile) {
                     alert('Please select both files before submitting.');
                     return;
                 }
                 
-                await uploadSingleFiles(lunitFile, gtFile, threshold);
+                await uploadSingleFiles(lunitFile, gtFile, supplementalSteps);
             } else {
                 // Multiple files mode
                 const lunitFiles = document.getElementById('lunitFiles').files;
                 const gtFiles = document.getElementById('gtFiles').files;
-                const threshold = document.getElementById('threshold').value;
                 
                 if (lunitFiles.length === 0 || gtFiles.length === 0) {
                     alert('Please select at least one file for both Carpl and RIS categories before submitting.');
                     return;
                 }
                 
-                await uploadMultipleFiles(lunitFiles, gtFiles, threshold);
+                await uploadMultipleFiles(lunitFiles, gtFiles, supplementalSteps);
             }
         });
 
-        async function uploadSingleFiles(lunitFile, gtFile, threshold) {
+        async function uploadSingleFiles(lunitFile, gtFile, supplementalSteps = false) {
             const formData = new FormData();
             formData.append('lunit_file', lunitFile);
             formData.append('ground_truth_file', gtFile);
-            formData.append('priority_threshold', threshold);
+            formData.append('supplemental_steps', supplementalSteps);
             
             // Update UI to show upload status
             document.getElementById('submitBtn').disabled = true;
@@ -717,7 +711,7 @@
             const statusContainer = document.getElementById('statusContainer');
             statusContainer.className = 'status-container status-uploading';
             statusContainer.style.display = 'block';
-            document.getElementById('statusMessage').textContent = '📤 Uploading files...';
+            document.getElementById('statusMessage').textContent = `📤 Uploading files...${supplementalSteps ? ' (Supplemental processing enabled)' : ''}`;
             updateProgress(0, 'Preparing upload...');
             
             try {
@@ -741,7 +735,7 @@
             }
         }
 
-        async function uploadMultipleFiles(lunitFiles, gtFiles, threshold) {
+        async function uploadMultipleFiles(lunitFiles, gtFiles, supplementalSteps = false) {
             const formData = new FormData();
             
             // Append all lunit files
@@ -754,7 +748,7 @@
                 formData.append('ground_truth_files', gtFiles[i]);
             }
             
-            formData.append('priority_threshold', threshold);
+            formData.append('supplemental_steps', supplementalSteps);
             
             // Update UI to show upload status
             document.getElementById('submitBtn').disabled = true;
@@ -763,7 +757,7 @@
             const statusContainer = document.getElementById('statusContainer');
             statusContainer.className = 'status-container status-uploading';
             statusContainer.style.display = 'block';
-            document.getElementById('statusMessage').textContent = `📤 Uploading ${lunitFiles.length + gtFiles.length} files...`;
+            document.getElementById('statusMessage').textContent = `📤 Uploading ${lunitFiles.length + gtFiles.length} files...${supplementalSteps ? ' (Supplemental processing enabled)' : ''}`;
             updateProgress(0, 'Preparing upload...');
             
             try {
@@ -792,9 +786,11 @@
             
             const statusContainer = document.getElementById('statusContainer');
             statusContainer.className = 'status-container status-processing';
-            document.getElementById('statusMessage').textContent = '🔄 Processing files...';
+            document.getElementById('statusMessage').textContent = '🔄 Files uploaded, queued for processing...';
             
-            statusCheckInterval = setInterval(checkStatus, 2000);
+            // Check status immediately, then every 1 second for more responsive updates
+            checkStatus();
+            statusCheckInterval = setInterval(checkStatus, 1000);
         }
 
         async function checkStatus() {
@@ -804,7 +800,14 @@
                 const response = await fetch(`${API_BASE_URL}/status/${currentTaskId}`);
                 const status = await response.json();
                 
-                updateProgress(getProgressPercentage(status.status), status.progress || 'Processing...');
+                // Update status message with actual progress from server
+                const statusMessage = document.getElementById('statusMessage');
+                if (status.progress) {
+                    statusMessage.textContent = `🔄 ${status.progress}`;
+                }
+                
+                // Update progress bar
+                updateProgress(getProgressPercentage(status.status, status.progress), status.progress || 'Processing...');
                 
                 if (status.status === 'completed') {
                     clearInterval(statusCheckInterval);
@@ -819,14 +822,28 @@
             }
         }
 
-        function getProgressPercentage(status) {
+        function getProgressPercentage(status, progressText) {
+            // Base percentage on status
+            let basePercentage;
             switch (status) {
-                case 'queued': return 15;
-                case 'processing': return 50;
-                case 'completed': return 100;
-                case 'failed': return 0;
-                default: return 25;
+                case 'queued': basePercentage = 15; break;
+                case 'processing': basePercentage = 30; break;
+                case 'completed': basePercentage = 100; break;
+                case 'failed': basePercentage = 0; break;
+                default: basePercentage = 25; break;
             }
+            
+            // Refine percentage based on progress text keywords
+            if (progressText && status === 'processing') {
+                if (progressText.includes('Initializing')) return 20;
+                if (progressText.includes('Loaded') && progressText.includes('reports')) return 35;
+                if (progressText.includes('accuracy')) return 55;
+                if (progressText.includes('time statistics')) return 70;
+                if (progressText.includes('false negative')) return 85;
+                if (progressText.includes('Analysis complete')) return 95;
+            }
+            
+            return basePercentage;
         }
 
         async function fetchResults() {
